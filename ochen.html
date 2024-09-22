@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Циклы Бизнес</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <style>
+        body {
+            overflow-x: hidden;
+        }
+        #chartContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+    </style>
+</head>
+<body class="light-mode">
+    <div>
+        <nav class="navbar navbar-expand-md navbar-light bg-light">
+            <a class="navbar-brand" href="#">Циклы <span class="badge bg-dark text-light">Бизнес</span></a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav m-3">
+                    <li class="nav-item d-md-none d-block">
+                        <button class="btn btn-primary" data-toggle="modal" data-target="#addChartModal">Добавить график</button>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="row">
+            <nav id="sidebar" class="col-md-2 d-none d-md-block bg-light sidebar">
+                <div class="sidebar-sticky" id="controlsContainer">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <button class="btn btn-primary m-3" data-toggle="modal" data-target="#addChartModal">Добавить график</button>
+                        </li>
+                    </ul>
+                    <div class="mt-2" id="controlContainer"></div>
+                </div>
+            </nav>
+
+            <main role="main" class="col-md-10 ml-sm-auto col-lg-10 px-md-4">
+                <div id="chartContainer"></div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addChartModal" tabindex="-1" aria-labelledby="addChartModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addChartModalLabel">Добавить график</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="chartForm">
+                        <div class="form-group">
+                            <label for="cycleType">Выберите цикл</label>
+                            <select class="form-control" id="cycleType" required>
+                                <option value="">--Выберите--</option>
+                                <option value="kondratiev">Циклы Кондратьева (50 лет)</option>
+                                <option value="kuznets">Ритмы Саймона Кузнеца (15 лет)</option>
+                                <option value="juglar">Циклы Жюгляра (7-11 лет)</option>
+                                <option value="kitchin">Циклы Китчина (3-5 лет)</option>
+                                <option value="fateAndWill">График судьбы и воли</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="startDate">Дата начала</label>
+                            <input type="date" class="form-control" id="startDate" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Добавить график</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('chartForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const cycleType = document.getElementById('cycleType').value;
+            const startDate = document.getElementById('startDate').value;
+
+            if (!cycleType || !startDate) {
+                alert('Заполните все поля!');
+                return;
+            }
+
+            addChart(cycleType, startDate);
+            $('#addChartModal').modal('hide');
+            document.getElementById('chartForm').reset();
+        });
+
+        let chartCount = 0;
+
+        function addChart(cycleType, startDate) {
+            chartCount++;
+            const chartId = 'chart' + chartCount;
+
+            // Создаем контейнер для графика
+            const chartContainer = document.createElement('div');
+            chartContainer.style.height = '33vh';
+            chartContainer.innerHTML = `<div class="my-2" id="${chartId}"></div>`;
+            document.getElementById('chartContainer').appendChild(chartContainer);
+
+            // Создаем контрол для изменения длины таймлайна
+            const rangeContainer = document.createElement('div');
+            rangeContainer.classList.add('p-2');
+            rangeContainer.innerHTML = `
+                <label for="timelineLength${chartCount}">Длина таймлайна (лет): </label>
+                <input type="range" id="timelineLength${chartCount}" min="30" max="100" value="100" class="form-control-range">
+                <span id="timelineValue${chartCount}">100</span> лет
+            `;
+            document.getElementById('controlsContainer').appendChild(rangeContainer);
+
+            const range = 100; // начальная длина
+            const bennerData = generateBennerCycleData(startDate, range);
+            const series = [{
+                name: 'Цикл Беннера',
+                data: bennerData
+            }];
+
+            if (cycleType === 'fateAndWill') {
+                series.push({
+                    name: 'Судьба',
+                    data: generateFateData(startDate, range)
+                });
+                series.push({
+                    name: 'Воля',
+                    data: generateWillData(startDate, range)
+                });
+            } else {
+                const cycleData = generateCycleData(cycleType, startDate, range);
+                const cycleNames = {
+                    kondratiev: 'Циклы Кондратьева (50 лет)',
+                    kuznets: 'Ритмы Саймона Кузнеца (15 лет)',
+                    juglar: 'Циклы Жюгляра (7-11 лет)',
+                    kitchin: 'Циклы Китчина (3-5 лет)',
+                };
+                series.push({
+                    name: cycleNames[cycleType],
+                    data: cycleData
+                });
+            }
+
+            const allData = series.flatMap(s => s.data.map(d => d[1]));
+            const minY = Math.min(0, ...allData);
+            const maxY = Math.max(...allData);
+
+            const options = {
+                chart: {
+                    type: 'line',
+                    height: '100%'
+                },
+                series: series,
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        formatter: function(value) {
+                            return new Date(value).getFullYear();
+                        }
+                    },
+                    title: {
+                        text: 'Годы'
+                    }
+                },
+                yaxis: {
+                    min: minY,
+                    max: maxY,
+                    title: {
+                        text: 'Значение'
+                    },
+                    labels: {
+                        formatter: function(value) {
+                            return value.toFixed(3);
+                        }
+                    }
+                },
+                tooltip: {
+                    shared: true,
+                    intersect: false
+                }
+            };
+
+            const chart = new ApexCharts(document.querySelector(`#${chartId}`), options);
+            chart.render();
+
+            // Добавляем обработчик для бегунка
+            const timelineLengthInput = document.getElementById(`timelineLength${chartCount}`);
+            const timelineValueSpan = document.getElementById(`timelineValue${chartCount}`);
+
+            timelineLengthInput.addEventListener('input', function() {
+                const range = parseInt(this.value);
+                timelineValueSpan.textContent = range;
+
+                // Обновляем данные графика
+                const newBennerData = generateBennerCycleData(startDate, range);
+                const newCycleData = cycleType === 'fateAndWill'
+                    ? [generateFateData(startDate, range), generateWillData(startDate, range)]
+                    : [generateCycleData(cycleType, startDate, range)];
+
+                const updatedSeries = [{
+                    name: 'Цикл Беннера',
+                    data: newBennerData
+                }];
+                if (cycleType === 'fateAndWill') {
+                    updatedSeries.push({
+                        name: 'Судьба',
+                        data: newCycleData[0]
+                    });
+                    updatedSeries.push({
+                        name: 'Воля',
+                        data: newCycleData[1]
+                    });
+                } else {
+                    updatedSeries.push({
+                        name: cycleType,
+                        data: newCycleData[0]
+                    });
+                }
+
+                // Перерисовываем график
+                chart.updateSeries(updatedSeries);
+            });
+        }
+
+        function generateCycleData(cycleType, startDate, range) {
+            const startYear = new Date(startDate).getFullYear();
+            const labels = generateYearLabels(startYear, range);
+            const data = {
+                kondratiev: labels.map((_, index) => Math.sin(index * 0.1) * 50 + 50),
+                kuznets: labels.map((_, index) => Math.cos(index * 0.2) * 40 + 60),
+                juglar: labels.map((_, index) => Math.sin(index * 0.3) * 30 + 70),
+                kitchin: labels.map((_, index) => Math.cos(index * 0.4) * 20 + 80),
+            };
+
+            const cycleData = data[cycleType];
+            const firstValue = cycleData[0];
+
+            return cycleData.map((value, index) => [labels[index].getTime(), value - firstValue]);
+        }
+
+        function generateFateData(startDate, range) {
+            const birthDate = new Date(startDate);
+            const day = birthDate.getDate();
+            const month = birthDate.getMonth() + 1;
+            const year = birthDate.getFullYear();
+
+            const fateBase = (day < 10 ? '0' : '') + day + (month < 10 ? '0' : '') + month;
+            let fateNumber = parseInt(fateBase) * year;
+            fateNumber = formatNumber(fateNumber);
+
+            const labels = generateYearLabels(year, range);
+            return labels.map((label, index) => [label.getTime(), parseInt(fateNumber.charAt(index % 7)) || 0]);
+        }
+
+        function generateWillData(startDate, range) {
+            const birthDate = new Date(startDate);
+            const day = birthDate.getDate();
+            const month = birthDate.getMonth() + 1;
+            const year = birthDate.getFullYear().toString().replace(/0/g, '1');
+
+            const willBase = (day < 10 ? '0' : '') + day + (month < 10 ? '0' : '') + month;
+            let willNumber = parseInt(willBase.replace(/0/g, '1')) * year;
+            willNumber = formatNumber(willNumber);
+
+            const labels = generateYearLabels(birthDate.getFullYear(), range);
+            return labels.map((label, index) => [label.getTime(), parseInt(willNumber.charAt(index % 7)) || 0]);
+        }
+
+        function formatNumber(number) {
+            let str = number.toString();
+            while (str.length < 7) {
+                str = '0' + str;
+            }
+            return str;
+        }
+
+        function generateBennerCycleData(startDate, range) {
+            const startYear = new Date(startDate).getFullYear();
+            const labels = generateYearLabels(startYear, range);
+            const data = [];
+
+            for (let i = 0; i < range; i++) {
+                let value;
+                if (i % 6 < 2) {
+                    value = Math.sin(i * 0.5) * 30 + 70;
+                } else if (i % 6 < 4) {
+                    value = Math.sin(i * 0.5) * 20 + 50;
+                } else {
+                    value = Math.sin(i * 0.5) * 10 + 30;
+                }
+                data.push(value);
+            }
+
+            const firstValue = data[0];
+
+            return data.map((value, index) => [labels[index].getTime(), value - firstValue]);
+        }
+
+        function generateYearLabels(startYear, range, interval = 1) {
+            return Array.from({ length: range }, (_, i) => new Date(startYear + i * interval, 0, 1));
+        }
+    </script>
+</body>
+</html>

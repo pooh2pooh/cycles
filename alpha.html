@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Циклы Беннера и Кондратьева</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <style>
+        body {
+            overflow-x: hidden;
+        }
+        #chartContainer {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .dark-mode {
+            background-color: #121212;
+            color: white;
+        }
+        .dark-mode .navbar, .dark-mode .sidebar {
+            background-color: #1f1f1f;
+        }
+        .light-mode {
+            background-color: #ffffff;
+            color: black;
+        }
+    </style>
+</head>
+<body class="light-mode">
+    <div class="container-fluid">
+        <nav class="navbar navbar-expand-md navbar-light bg-light">
+            <a class="navbar-brand" href="#">Циклы</a>
+            <div class="form-inline">
+                <label class="mr-2" for="themeToggle">Тема:</label>
+                <select id="themeToggle" class="form-control">
+                    <option value="light">Светлая</option>
+                    <option value="dark">Темная</option>
+                </select>
+            </div>
+        </nav>
+
+        <div class="row">
+            <nav id="sidebar" class="col-md-2 d-none d-md-block bg-light sidebar">
+                <div class="sidebar-sticky" id="controlsContainer">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <button class="btn btn-primary m-3" data-toggle="modal" data-target="#addChartModal">Добавить</button>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <main role="main" class="col-md-10 ml-sm-auto col-lg-10 px-md-4">
+                <div id="chartContainer"></div>
+            </main>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addChartModal" tabindex="-1" aria-labelledby="addChartModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addChartModalLabel">Добавить график</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="chartForm">
+                        <div class="form-group">
+                            <label for="cycleType">Выберите цикл</label>
+                            <select class="form-control" id="cycleType" required>
+                                <option value="">--Выберите--</option>
+                                <option value="kondratiev">Циклы Кондратьева</option>
+                                <option value="kuznets">Ритмы Саймона Кузнеца</option>
+                                <option value="juglar">Циклы Жюгляра</option>
+                                <option value="kitchin">Циклы Китчина</option>
+                                <option value="fateAndWill">График судьбы и воли</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="startDate">Дата начала</label>
+                            <input type="date" class="form-control" id="startDate" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Добавить график</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('chartForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const cycleType = document.getElementById('cycleType').value;
+            const startDate = document.getElementById('startDate').value;
+            if (!cycleType || !startDate) {
+                alert('Заполните все поля!');
+                return;
+            }
+
+            addChart(cycleType, startDate);
+            $('#addChartModal').modal('hide');
+            document.getElementById('chartForm').reset();
+        });
+
+        let chartCount = 0;
+
+        function addChart(cycleType, startDate) {
+            chartCount++;
+            const chartId = 'chart' + chartCount;
+            const chartContainer = document.createElement('div');
+            chartContainer.style.height = '33vh';
+            chartContainer.innerHTML = `<canvas id="${chartId}"></canvas>`;
+            document.getElementById('chartContainer').appendChild(chartContainer);
+
+            const ctx = document.getElementById(chartId).getContext('2d');
+            const chartData = generateChartData(cycleType, startDate, 100);
+
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: chartData.data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'year'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Годы'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `${tooltipItem.dataset.label}: ${tooltipItem.raw}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function generateChartData(cycleType, startDate, range) {
+            const startYear = new Date(startDate).getFullYear();
+            const labels = generateYearLabels(startYear, range);
+
+            // Определяем временные интервалы для уровней A, B и C
+            const phaseLengths = {
+                A: 11,
+                B: 9,
+                C: 7
+            };
+
+            // Данные для уровней A, B и C для Цикла Беннера
+            const bennerData = [];
+            const bennerLevelB = [];
+
+            let currentPhase = 'A';
+            let currentPhaseLength = phaseLengths[currentPhase];
+            let phaseCounter = 0;
+
+            labels.forEach((_, i) => {
+                // Определяем уровень A
+                if (currentPhase === 'A') {
+                    bennerData.push(100 - (100 / currentPhaseLength) * phaseCounter);
+                    bennerLevelB.push(50 - (50 / currentPhaseLength) * phaseCounter);
+                }
+                // Уровень B должен быть без разрывов, добавляем продолжение
+                if (currentPhase === 'B') {
+                    bennerData.push(bennerData[bennerData.length - 1]);  // Продолжаем линию для уровня A
+                    bennerLevelB.push(50 - (50 / currentPhaseLength) * phaseCounter);
+                }
+                // Уровень C должен быть без разрывов, добавляем продолжение
+                if (currentPhase === 'C') {
+                    bennerData.push(100 - (100 / currentPhaseLength) * phaseCounter); // Спад уровня A
+                    bennerLevelB.push(bennerLevelB[bennerLevelB.length - 1]);  // Продолжаем линию для уровня B
+                }
+
+                phaseCounter++;
+                if (phaseCounter >= currentPhaseLength) {
+                    // Переход на следующий уровень
+                    if (currentPhase === 'A') {
+                        currentPhase = 'B';
+                    } else if (currentPhase === 'B') {
+                        currentPhase = 'C';
+                    } else {
+                        currentPhase = 'A';
+                    }
+
+                    currentPhaseLength = phaseLengths[currentPhase];
+                    phaseCounter = 0;
+                }
+            });
+
+            const cycleData = {
+                kondratiev: labels.map((_, i) => Math.sin((i / 50) * Math.PI) * 20 + 50),
+                kuznets: labels.map((_, i) => Math.sin((i / 15) * Math.PI) * 15 + 50),
+                juglar: labels.map((_, i) => Math.sin((i / 10) * Math.PI) * 10 + 50),
+                kitchin: labels.map((_, i) => Math.sin((i / 3) * Math.PI) * 5 + 50),
+                fateAndWill: labels.map((_, i) => Math.sin((i / 8) * Math.PI) * 25 + 50)
+            }[cycleType];
+
+            return {
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Уровень A',
+                            data: bennerData,
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            fill: true
+                        },
+                        {
+                            label: 'Уровень B',
+                            data: bennerLevelB,
+                            borderColor: 'rgba(153, 102, 255, 1)',
+                            backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                            fill: true
+                        },
+                        {
+                            label: {
+                                kondratiev: 'Циклы Кондратьева',
+                                kuznets: 'Ритмы Саймона Кузнеца',
+                                juglar: 'Циклы Жюгляра',
+                                kitchin: 'Циклы Китчина',
+                                fateAndWill: 'График судьбы и воли'
+                            }[cycleType],
+                            data: cycleData,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: true
+                        }
+                    ]
+                }
+            };
+        }
+
+        function generateYearLabels(startYear, numPoints) {
+            const years = [];
+            for (let i = 0; i < numPoints; i++) {
+                years.push(new Date(startYear + i, 0, 1));
+            }
+            return years;
+        }
+
+        document.getElementById('themeToggle').addEventListener('change', function () {
+            const selectedTheme = this.value;
+            if (selectedTheme === 'dark') {
+                document.body.classList.remove('light-mode');
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.body.classList.add('light-mode');
+            }
+        });
+    </script>
+</body>
+</html>
+

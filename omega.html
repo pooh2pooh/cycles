@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Line Charts</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+        }
+
+        .content {
+            overflow-y: auto;
+            max-height: 100vh;
+            padding: 1rem;
+        }
+
+        .form-range::-webkit-slider-runnable-track {
+            height: 8px;
+            background: #e9ecef;
+        }
+
+        .form-range::-webkit-slider-thumb {
+            width: 16px;
+            height: 16px;
+            background: #007bff;
+            border-radius: 50%;
+            margin-top: -4px;
+            cursor: pointer;
+        }
+
+        .range-label {
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-3 col-lg-2 sidebar">
+                <h4>Меню</h4>
+                <button id="addChartBtn" class="btn btn-primary w-100 mt-3" data-bs-toggle="modal"
+                    data-bs-target="#chartModal">Добавить график</button>
+                <div id="charts-list" class="mt-4">
+                </div>
+            </div>
+
+            <div class="col-md-9 col-lg-10 content">
+                <div id="chart-container" class="row mt-3">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="chartModal" tabindex="-1" aria-labelledby="chartModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="chartModalLabel">Добавить график</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="chartForm">
+                        <div class="mb-3">
+                            <label for="cycleSelect" class="form-label">Выберите цикл</label>
+                            <select class="form-select" id="cycleSelect">
+                                <option value="Кондратьев">Циклы Кондратьева</option>
+                                <option value="Кузнец">Ритмы Саймона Кузнеца</option>
+                                <option value="Жюгляр">Циклы Жюгляра</option>
+                                <option value="Китчин">Циклы Китчина</option>
+                                <option value="Судьба и воля">График судьбы и воли</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="dateInput" class="form-label">Выберите дату начала</label>
+                            <input type="date" class="form-control" id="dateInput">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveChartBtn">Добавить график</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.Apex = {
+            chart: {
+                foreColor: '#333',
+                toolbar: {
+                    show: false
+                },
+            },
+            colors: ['#00A3E0', '#FFC107', '#28A745'],
+            stroke: {
+                width: 3
+            },
+            dataLabels: {
+                enabled: false
+            },
+            grid: {
+                borderColor: "#e0e0e0",
+            },
+            xaxis: {
+                axisTicks: {
+                    color: '#333'
+                },
+                axisBorder: {
+                    color: "#333"
+                },
+                labels: {
+                    formatter: function (val) {
+                        return new Date(val).getFullYear();
+                    }
+                }
+            },
+            fill: {
+                type: 'solid',
+                opacity: 1
+            },
+            tooltip: {
+                theme: 'light',
+                x: {
+                    formatter: function (val) {
+                        return new Date(val).getFullYear();
+                    }
+                }
+            },
+            yaxis: {
+                decimalsInFloat: 2,
+                labels: {
+                    offsetX: -10
+                }
+            },
+            legend: {
+                fontSize: '12px',
+                markers: {
+                    width: 12,
+                    height: 12,
+                }
+            }
+        };
+
+        var cycleParameters = {
+            "Кондратьев": 54,
+            "Кузнец": 18,
+            "Жюгляр": 9,
+            "Китчин": 4,
+            "Судьба и воля": 7,
+            "Беннер": 11
+        };
+
+        function generateYearlyTimeSeries(baseval, count, cycleLength) {
+            var i = 0;
+            var series = [];
+            while (i < count) {
+                var x = baseval;
+                var y = Math.sin(i / cycleLength) * (cycleLength / 2) + (cycleLength / 2);
+                series.push([x, y]);
+                baseval += 31556952000; // 1 год в миллисекундах
+                i++;
+            }
+            return series;
+        }
+
+        function createChart(baseDate, cycle, containerId, years = 100) {
+    var cycleLength = cycleParameters[cycle];
+    var seriesData = generateYearlyTimeSeries(baseDate.getTime(), years, cycleLength);
+    var bennerData = generateYearlyTimeSeries(baseDate.getTime(), years, cycleParameters["Беннер"]);
+
+    // Найдем максимальное и минимальное значение для основного графика
+    var minY = Math.min(...seriesData.map(point => point[1]));
+    var maxY = Math.max(...seriesData.map(point => point[1]));
+
+    var optionsLine = {
+        chart: {
+            height: 300,
+            type: 'line',
+            stacked: false,
+            animations: {
+                enabled: true,
+                easing: 'linear',
+                dynamicAnimation: {
+                    speed: 1000
+                }
+            },
+            toolbar: {
+                show: false
+            },
+            zoom: {
+                enabled: false
+            }
+        },
+        series: [
+            {
+                name: 'Цикл Беннера (фон)',
+                data: bennerData,
+                type: 'line',
+                stroke: {
+                    width: 1,
+                    dashArray: 2,
+                    color: '#00A3E0'
+                },
+                yAxisIndex: 1, // Используем отдельную ось Y для фона
+                fill: {
+                    opacity: 0
+                },
+            },
+            {
+                name: `График (${cycle})`,
+                data: seriesData,
+                type: 'line',
+                stroke: {
+                    width: 4
+                }
+            }
+        ],
+        xaxis: {
+            type: 'datetime',
+            labels: {
+                format: 'yyyy'
+            }
+        },
+        yaxis: [
+            {
+                title: {
+                    text: 'Основной график'
+                },
+                min: minY,
+                max: maxY,
+                labels: {
+                    show: true
+                }
+            },
+            {
+                title: {
+                    text: 'Цикл Беннера'
+                },
+                opposite: true,
+                min: minY,
+                max: maxY,
+                labels: {
+                    show: false
+                }
+            }
+        ],
+        grid: {
+            borderColor: '#e0e0e0'
+        },
+        title: {
+            text: `Циклы ${cycle}`,
+            align: 'left',
+            style: {
+                fontSize: '12px'
+            }
+        },
+        subtitle: {
+            text: `Дата начала: ${new Date(baseDate).getFullYear()}`,
+            align: 'left',
+            style: {
+                fontSize: '10px'
+            }
+        },
+        legend: {
+            position: 'top',
+            horizontalAlign: 'right'
+        }
+    };
+
+    var chart = new ApexCharts(document.querySelector(containerId), optionsLine);
+    chart.render();
+}
+
+
+        document.getElementById('saveChartBtn').addEventListener('click', function () {
+            var cycle = document.getElementById("cycleSelect").value;
+            var date = new Date(document.getElementById("dateInput").value);
+
+            if (cycle && date) {
+                var chartId = 'chart-' + Date.now();
+                var chartContainer = document.createElement('div');
+                chartContainer.className = 'col-12 col-lg-6 mb-4';
+                chartContainer.innerHTML = `<div id="${chartId}" class="chart"></div>`;
+                document.getElementById('chart-container').appendChild(chartContainer);
+
+                createChart(date, cycle, `#${chartId}`);
+                document.getElementById('chartModal').querySelector('.btn-close').click();
+            }
+        });
+    </script>
+</body>
+
+</html>
