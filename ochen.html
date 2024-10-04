@@ -23,7 +23,7 @@
             align-items: flex-start;
             gap: 20px;
             height: auto; /* Позволяет высоте адаптироваться к содержимому */
-            min-height: 200px; /* Минимальная высота */
+            min-height: 33vh; /* Минимальная высота */
             width: 100%; /* Занимает полную ширину родительского контейнера */
             padding: 10px;
             border: 1px solid #ddd;
@@ -32,7 +32,7 @@
 
         .chart-wrapper {
             flex: 1;
-            height: 400px; /* Установите фиксированную высоту для графика */
+            height: 100%; /* Установите фиксированную высоту для графика */
         }
 
         .controls-wrapper {
@@ -108,7 +108,7 @@
             <nav id="sidebar" class="col-md-2 d-none d-md-block bg-light sidebar">
                 <div class="sidebar-sticky" id="controlsContainer">
                     <ul class="nav flex-column">
-                        
+                        <!-- Контролы будут добавляться динамически рядом с каждым графиком -->
                     </ul>
                 </div>
             </nav>
@@ -119,7 +119,7 @@
         </div>
     </div>
 
-    <!-- Добавьте эту кнопку после основного контейнера или в любое подходящее место -->
+    <!-- Закрепленная кнопка "Добавить график" -->
     <button class="btn btn-primary fixed-add-button" data-toggle="modal" data-target="#addChartModal">
         Добавить график
     </button>
@@ -144,6 +144,7 @@
                                 <option value="juglar">Циклы Жюгляра (7-11 лет)</option>
                                 <option value="kitchin">Циклы Китчина (3-5 лет)</option>
                                 <option value="fateAndWill">График судьбы и воли</option>
+                                <option value="benner">Цикл Беннера</option> <!-- Новая опция -->
                             </select>
                         </div>
                         <div class="form-group">
@@ -165,7 +166,8 @@
             kuznets: 'Ритмы Саймона Кузнеца (15 лет)',
             juglar: 'Циклы Жюгляра (7-11 лет)',
             kitchin: 'Циклы Китчина (3-5 лет)',
-            fateAndWill: 'График судьбы и воли'
+            fateAndWill: 'График судьбы и воли',
+            benner: 'Цикл Беннера' // Новая запись
         };
 
         document.getElementById('chartForm').addEventListener('submit', function (e) {
@@ -193,12 +195,13 @@
             const chartContainer = document.createElement('div');
             chartContainer.id = `chartContainer${currentChartId}`;
             chartContainer.classList.add('chart-container');
+            chartContainer.style.height = "33vh";
             chartContainer.innerHTML = `
                 <div class="chart-wrapper">
                     <div id="${chartId}" style="width: 100%; height: 100%;"></div>
                 </div>
                 <div class="controls-wrapper" id="${controlId}">
-                    ${cycleType !== 'fateAndWill' ? `
+                    ${cycleType !== 'benner' && cycleType !== 'fateAndWill' ? `
                         <div class="control-group">
                             <label for="cycleFrequency${currentChartId}">Длина ${cycleNames[cycleType]}: </label>
                             <input type="range" id="cycleFrequency${currentChartId}" min="0.1" max="5" step="0.1" value="1" class="form-control-range">
@@ -213,6 +216,7 @@
             const range = 100; // начальная длина
             let bennerData = generateBennerCycleData(startDate, range);
             let series = [];
+            let annotations = {};
 
             if (cycleType === 'fateAndWill') {
                 const fateData = generateFateData(startDate, range);
@@ -231,6 +235,13 @@
                         data: willData
                     }
                 ];
+            } else if (cycleType === 'benner') {
+                series = [
+                    {
+                        name: 'Цикл Беннера',
+                        data: bennerData
+                    }
+                ];
             } else {
                 const cycleData = generateCycleData(cycleType, startDate, range, 1); // 1 - начальная частота
                 series = [
@@ -244,6 +255,9 @@
                     }
                 ];
             }
+
+            // Генерация аннотаций для цикла Беннера
+            annotations = generateBennerAnnotations(bennerData);
 
             const allData = series.flatMap(s => s.data.map(d => d[1]));
             const minY = Math.min(0, ...allData);
@@ -290,14 +304,15 @@
                 },
                 markers: {
                     size: 4
-                }
+                },
+                annotations: annotations // Добавляем аннотации, если есть
             };
 
             const chart = new ApexCharts(document.getElementById(chartId), options);
             chart.render();
 
-            // Если не "График судьбы и воли", добавляем обработчики для бегунка частоты
-            if (cycleType !== 'fateAndWill') {
+            // Если не "Цикл Беннера" и не "График судьбы и воли", добавляем обработчики для бегунка частоты
+            if (cycleType !== 'benner' && cycleType !== 'fateAndWill') {
                 const frequencySlider = document.getElementById(`cycleFrequency${currentChartId}`);
                 const frequencyValue = document.getElementById(`cycleFrequencyValue${currentChartId}`);
 
@@ -326,10 +341,12 @@
                         }
                     });
 
-                    chart.updateSeries([
-                        { name: 'Цикл Беннера', data: bennerData },
-                        { name: cycleNames[cycleType], data: newCycleData }
-                    ]);
+                    if (cycleType !== 'benner') {
+                        chart.updateSeries([
+                            { name: 'Цикл Беннера', data: bennerData },
+                            { name: cycleNames[cycleType], data: newCycleData }
+                        ]);
+                    }
                 });
             }
         }
@@ -394,11 +411,11 @@
             const historicalValues = [];
             for (let year = 1920; year <= 2059; year++) {
                 if (bennerCycles.A.includes(year)) {
-                    historicalValues.push(50); // Период паники
+                    historicalValues.push(50); // Период A
                 } else if (bennerCycles.B.includes(year)) {
-                    historicalValues.push(20); // Период "продавай"
+                    historicalValues.push(20); // Период B
                 } else if (bennerCycles.C.includes(year)) {
-                    historicalValues.push(-20); // Период "покупай"
+                    historicalValues.push(-20); // Период C
                 } else {
                     historicalValues.push(0); // Нейтральные годы
                 }
@@ -467,6 +484,47 @@
                 labels.push(new Date(year, 0, 1));
             }
             return labels;
+        }
+
+        // Функция для генерации аннотаций цикла Беннера
+        function generateBennerAnnotations(bennerData) {
+            const annotations = {
+                points: []
+            };
+
+            bennerData.forEach(([x, y]) => {
+                let labelText = '';
+                if (y === 50) {
+                    labelText = 'A';
+                } else if (y === 20) {
+                    labelText = 'B';
+                } else if (y === -20) {
+                    labelText = 'C';
+                }
+
+                if (labelText) {
+                    annotations.points.push({
+                        x: x,
+                        y: y,
+                        marker: {
+                            size: 0 // Убираем маркер, чтобы не было двойных точек
+                        },
+                        label: {
+                            text: labelText,
+                            style: {
+                                color: '#fff',
+                                background: '#775DD0',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                            },
+                            offsetY: y > 0 ? -15 : 15, // Смещение метки вверх или вниз в зависимости от значения y
+                            textAnchor: 'middle'
+                        }
+                    });
+                }
+            });
+
+            return annotations;
         }
     </script>
 </body>
