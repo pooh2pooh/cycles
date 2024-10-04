@@ -17,6 +17,75 @@
             flex-direction: column;
             gap: 20px;
         }
+        .chart-container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 20px;
+            height: auto; /* Позволяет высоте адаптироваться к содержимому */
+            min-height: 200px; /* Минимальная высота */
+            width: 100%; /* Занимает полную ширину родительского контейнера */
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+            height: 400px; /* Установите фиксированную высоту для графика */
+        }
+
+        .controls-wrapper {
+            width: 250px; /* Ширина для контролов */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            font-weight: bold;
+        }
+
+        .delete-button {
+            align-self: flex-start; /* Располагает кнопку по левому краю контролов */
+        }
+
+        /* Закрепленная кнопка "Добавить график" на десктопе */
+        .fixed-add-button {
+            position: fixed;
+            bottom: 20px; /* Отступ от нижнего края */
+            right: 20px;  /* Отступ от правого края */
+            z-index: 1000; /* Поверх других элементов */
+        }
+
+        @media (max-width: 767.98px) {
+            /* Убираем фиксированное позиционирование на мобильных устройствах */
+            .fixed-add-button {
+                position: static;
+                margin: 10px;
+            }
+        }
+
+        /* Медиа-запрос для мобильных устройств */
+        @media (max-width: 767.98px) {
+            .chart-container {
+                flex-direction: column;
+            }
+
+            .controls-wrapper {
+                width: 100%; /* Ширина контролов на мобильных устройствах */
+                margin-top: 20px; /* Отступ сверху для отделения от графика */
+            }
+
+            .delete-button {
+                width: 100%; /* Кнопка "Удалить" занимает всю ширину контролов */
+                margin-top: 10px; /* Отступ сверху */
+            }
+        }
     </style>
 </head>
 <body class="light-mode">
@@ -39,11 +108,8 @@
             <nav id="sidebar" class="col-md-2 d-none d-md-block bg-light sidebar">
                 <div class="sidebar-sticky" id="controlsContainer">
                     <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <button class="btn btn-primary m-3" data-toggle="modal" data-target="#addChartModal">Добавить график</button>
-                        </li>
+                        
                     </ul>
-                    <div class="mt-2" id="controlContainer"></div>
                 </div>
             </nav>
 
@@ -52,6 +118,11 @@
             </main>
         </div>
     </div>
+
+    <!-- Добавьте эту кнопку после основного контейнера или в любое подходящее место -->
+    <button class="btn btn-primary fixed-add-button" data-toggle="modal" data-target="#addChartModal">
+        Добавить график
+    </button>
 
     <div class="modal fade" id="addChartModal" tabindex="-1" aria-labelledby="addChartModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -87,6 +158,16 @@
     </div>
 
     <script>
+        let chartCount = 0;
+
+        const cycleNames = {
+            kondratiev: 'Циклы Кондратьева',
+            kuznets: 'Ритмы Саймона Кузнеца (15 лет)',
+            juglar: 'Циклы Жюгляра (7-11 лет)',
+            kitchin: 'Циклы Китчина (3-5 лет)',
+            fateAndWill: 'График судьбы и воли'
+        };
+
         document.getElementById('chartForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const cycleType = document.getElementById('cycleType').value;
@@ -102,56 +183,66 @@
             document.getElementById('chartForm').reset();
         });
 
-        let chartCount = 0;
-
         function addChart(cycleType, startDate) {
             chartCount++;
-            const chartId = 'chart' + chartCount;
+            const currentChartId = chartCount;
+            const chartId = 'chart' + currentChartId;
+            const controlId = 'control' + currentChartId;
 
-            // Создаем контейнер для графика
+            // Создаем контейнер для графика и контролов
             const chartContainer = document.createElement('div');
-            chartContainer.style.height = '33vh';
-            chartContainer.innerHTML = `<div class="my-2" id="${chartId}"></div>`;
+            chartContainer.id = `chartContainer${currentChartId}`;
+            chartContainer.classList.add('chart-container');
+            chartContainer.innerHTML = `
+                <div class="chart-wrapper">
+                    <div id="${chartId}" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="controls-wrapper" id="${controlId}">
+                    ${cycleType !== 'fateAndWill' ? `
+                        <div class="control-group">
+                            <label for="cycleFrequency${currentChartId}">Длина ${cycleNames[cycleType]}: </label>
+                            <input type="range" id="cycleFrequency${currentChartId}" min="0.1" max="5" step="0.1" value="1" class="form-control-range">
+                            <span id="cycleFrequencyValue${currentChartId}">${getYearsPerCycle(cycleType, 1)}</span>
+                        </div>
+                    ` : ''}
+                    <button class="btn btn-danger delete-button" onclick="removeChart(${currentChartId})">Удалить</button>
+                </div>
+            `;
             document.getElementById('chartContainer').appendChild(chartContainer);
 
-            // Создаем контрол для изменения длины таймлайна
-            const rangeContainer = document.createElement('div');
-            rangeContainer.classList.add('p-2');
-            rangeContainer.innerHTML = `
-                <label for="timelineLength${chartCount}">Длина таймлайна (лет): </label>
-                <input type="range" id="timelineLength${chartCount}" min="30" max="100" value="100" class="form-control-range">
-                <span id="timelineValue${chartCount}">100</span> лет
-            `;
-            document.getElementById('controlsContainer').appendChild(rangeContainer);
-
             const range = 100; // начальная длина
-            const bennerData = generateBennerCycleData(startDate, range);
-            const series = [{
-                name: 'Цикл Беннера',
-                data: bennerData
-            }];
+            let bennerData = generateBennerCycleData(startDate, range);
+            let series = [];
 
             if (cycleType === 'fateAndWill') {
-                series.push({
-                    name: 'Судьба',
-                    data: generateFateData(startDate, range)
-                });
-                series.push({
-                    name: 'Воля',
-                    data: generateWillData(startDate, range)
-                });
+                const fateData = generateFateData(startDate, range);
+                const willData = generateWillData(startDate, range);
+                series = [
+                    {
+                        name: 'Цикл Беннера',
+                        data: bennerData
+                    },
+                    {
+                        name: 'Судьба',
+                        data: fateData
+                    },
+                    {
+                        name: 'Воля',
+                        data: willData
+                    }
+                ];
             } else {
-                const cycleData = generateCycleData(cycleType, startDate, range);
-                const cycleNames = {
-                    kondratiev: 'Циклы Кондратьева (50 лет)',
-                    kuznets: 'Ритмы Саймона Кузнеца (15 лет)',
-                    juglar: 'Циклы Жюгляра (7-11 лет)',
-                    kitchin: 'Циклы Китчина (3-5 лет)',
-                };
-                series.push({
-                    name: cycleNames[cycleType],
-                    data: cycleData
-                });
+                const cycleData = generateCycleData(cycleType, startDate, range, 1); // 1 - начальная частота
+                series = [
+                    {
+                        name: 'Цикл Беннера',
+                        data: bennerData
+                    },
+                    {
+                        name: cycleNames[cycleType],
+                        data: cycleData
+                    }
+                ];
             }
 
             const allData = series.flatMap(s => s.data.map(d => d[1]));
@@ -161,7 +252,10 @@
             const options = {
                 chart: {
                     type: 'line',
-                    height: '100%'
+                    height: '100%',
+                    toolbar: {
+                        show: false
+                    }
                 },
                 series: series,
                 xaxis: {
@@ -183,72 +277,150 @@
                     },
                     labels: {
                         formatter: function(value) {
-                            return value.toFixed(3);
+                            return value.toFixed(3); // Ограничение до 3 знаков после точки
                         }
                     }
                 },
                 tooltip: {
                     shared: true,
                     intersect: false
+                },
+                stroke: {
+                    width: 2
+                },
+                markers: {
+                    size: 4
                 }
             };
 
-            const chart = new ApexCharts(document.querySelector(`#${chartId}`), options);
+            const chart = new ApexCharts(document.getElementById(chartId), options);
             chart.render();
 
-            // Добавляем обработчик для бегунка
-            const timelineLengthInput = document.getElementById(`timelineLength${chartCount}`);
-            const timelineValueSpan = document.getElementById(`timelineValue${chartCount}`);
+            // Если не "График судьбы и воли", добавляем обработчики для бегунка частоты
+            if (cycleType !== 'fateAndWill') {
+                const frequencySlider = document.getElementById(`cycleFrequency${currentChartId}`);
+                const frequencyValue = document.getElementById(`cycleFrequencyValue${currentChartId}`);
 
-            timelineLengthInput.addEventListener('input', function() {
-                const range = parseInt(this.value);
-                timelineValueSpan.textContent = range;
+                frequencySlider.addEventListener('input', function () {
+                    const frequency = parseFloat(this.value);
+                    frequencyValue.innerText = getYearsPerCycle(cycleType, frequency);
 
-                // Обновляем данные графика
-                const newBennerData = generateBennerCycleData(startDate, range);
-                const newCycleData = cycleType === 'fateAndWill'
-                    ? [generateFateData(startDate, range), generateWillData(startDate, range)]
-                    : [generateCycleData(cycleType, startDate, range)];
+                    const newCycleData = generateCycleData(cycleType, startDate, range, frequency);
+                    const updatedAllData = [
+                        ...bennerData,
+                        ...newCycleData
+                    ].map(d => d[1]);
 
-                const updatedSeries = [{
-                    name: 'Цикл Беннера',
-                    data: newBennerData
-                }];
-                if (cycleType === 'fateAndWill') {
-                    updatedSeries.push({
-                        name: 'Судьба',
-                        data: newCycleData[0]
+                    const newMinY = Math.min(0, ...updatedAllData);
+                    const newMaxY = Math.max(...updatedAllData);
+
+                    chart.updateOptions({
+                        yaxis: {
+                            min: newMinY,
+                            max: newMaxY,
+                            labels: {
+                                formatter: function(value) {
+                                    return value.toFixed(3); // Ограничение до 3 знаков после точки при обновлении
+                                }
+                            }
+                        }
                     });
-                    updatedSeries.push({
-                        name: 'Воля',
-                        data: newCycleData[1]
-                    });
-                } else {
-                    updatedSeries.push({
-                        name: cycleType,
-                        data: newCycleData[0]
-                    });
-                }
 
-                // Перерисовываем график
-                chart.updateSeries(updatedSeries);
-            });
+                    chart.updateSeries([
+                        { name: 'Цикл Беннера', data: bennerData },
+                        { name: cycleNames[cycleType], data: newCycleData }
+                    ]);
+                });
+            }
         }
 
-        function generateCycleData(cycleType, startDate, range) {
-            const startYear = new Date(startDate).getFullYear();
-            const labels = generateYearLabels(startYear, range);
-            const data = {
-                kondratiev: labels.map((_, index) => Math.sin(index * 0.1) * 50 + 50),
-                kuznets: labels.map((_, index) => Math.cos(index * 0.2) * 40 + 60),
-                juglar: labels.map((_, index) => Math.sin(index * 0.3) * 30 + 70),
-                kitchin: labels.map((_, index) => Math.cos(index * 0.4) * 20 + 80),
+        function removeChart(id) {
+            // Удаляем график и его контролы
+            const chartContainer = document.getElementById(`chartContainer${id}`);
+            if (chartContainer) {
+                chartContainer.remove();
+            }
+        }
+
+        // Функция для получения количества лет между вершинами
+        function getYearsPerCycle(cycleType, frequency) {
+            const cycleDurations = {
+                kondratiev: 50,
+                kuznets: 15,
+                juglar: 10,
+                kitchin: 4
             };
 
-            const cycleData = data[cycleType];
-            const firstValue = cycleData[0];
+            return cycleType in cycleDurations 
+                ? (cycleDurations[cycleType] / frequency).toFixed(1) + ' лет' 
+                : '';
+        }
 
-            return cycleData.map((value, index) => [labels[index].getTime(), value - firstValue]);
+        // Функция генерации данных цикла с настройками фазы и амплитуды
+        function generateCycleData(cycleType, startDate, range, frequency = 1, amplitude = 50, phaseShift = 0) {
+            const cycleData = [];
+            const startTimestamp = new Date(startDate).getTime();
+            const baseYears = {
+                kondratiev: 50,
+                kuznets: 15,
+                juglar: 10,
+                kitchin: 4
+            };
+            const baseFrequency = 1 / baseYears[cycleType];
+
+            for (let i = 0; i <= range; i++) {
+                const x = startTimestamp + i * 365 * 24 * 60 * 60 * 1000; // i лет от стартовой даты
+                const y = amplitude * Math.sin(2 * Math.PI * baseFrequency * frequency * i + phaseShift); // Добавлена амплитуда и фаза
+                cycleData.push([x, y]);
+            }
+
+            return cycleData;
+        }
+
+        // Годы циклов Беннера с изображений
+        const bennerCycles = {
+            A: [1927, 1945, 1965, 1981, 1999, 2019, 2035, 2053],
+            B: [1926, 1935, 1945, 1953, 1962, 1972, 1980, 1989, 1999, 2007, 2016, 2026, 2034, 2043, 2053],
+            C: [1924, 1931, 1942, 1951, 1958, 1969, 1978, 1985, 1996, 2005, 2012, 2023, 2032, 2039, 2050, 2059]
+        };
+
+        // Функция для генерации данных Беннера
+        function generateBennerCycleData(startDate, range) {
+            const startYear = new Date(startDate).getFullYear();
+            const labels = generateYearLabels(startYear, range);
+            const data = [];
+
+            // Сохранение исторических значений
+            const historicalValues = [];
+            for (let year = 1920; year <= 2059; year++) {
+                if (bennerCycles.A.includes(year)) {
+                    historicalValues.push(50); // Период паники
+                } else if (bennerCycles.B.includes(year)) {
+                    historicalValues.push(20); // Период "продавай"
+                } else if (bennerCycles.C.includes(year)) {
+                    historicalValues.push(-20); // Период "покупай"
+                } else {
+                    historicalValues.push(0); // Нейтральные годы
+                }
+            }
+
+            // Генерация данных
+            for (let i = 0; i < range; i++) {
+                const currentYear = startYear + i;
+
+                let value;
+                if (currentYear <= 2059) {
+                    value = historicalValues[currentYear - 1920]; // Используем исторические данные
+                } else {
+                    // Прогнозируем значения на основе последних паттернов
+                    const patternIndex = (currentYear - 2060) % historicalValues.length;
+                    value = historicalValues[patternIndex];
+                }
+
+                data.push([labels[i].getTime(), value]);
+            }
+
+            return data;
         }
 
         function generateFateData(startDate, range) {
@@ -287,30 +459,14 @@
             return str;
         }
 
-        function generateBennerCycleData(startDate, range) {
-            const startYear = new Date(startDate).getFullYear();
-            const labels = generateYearLabels(startYear, range);
-            const data = [];
-
+        // Используем текущую функцию для генерации меток лет
+        function generateYearLabels(startYear, range) {
+            const labels = [];
             for (let i = 0; i < range; i++) {
-                let value;
-                if (i % 6 < 2) {
-                    value = Math.sin(i * 0.5) * 30 + 70;
-                } else if (i % 6 < 4) {
-                    value = Math.sin(i * 0.5) * 20 + 50;
-                } else {
-                    value = Math.sin(i * 0.5) * 10 + 30;
-                }
-                data.push(value);
+                const year = startYear + i;
+                labels.push(new Date(year, 0, 1));
             }
-
-            const firstValue = data[0];
-
-            return data.map((value, index) => [labels[index].getTime(), value - firstValue]);
-        }
-
-        function generateYearLabels(startYear, range, interval = 1) {
-            return Array.from({ length: range }, (_, i) => new Date(startYear + i * interval, 0, 1));
+            return labels;
         }
     </script>
 </body>
